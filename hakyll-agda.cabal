@@ -11,12 +11,9 @@ Synopsis:           Wrapper to integrate literate Agda files with Hakyll
 Tested-With:        GHC==7.6.3
 Homepage:           https://github.com/bitonic/hakyll-agda
 Bug-Reports:        https://github.com/bitonic/hakyll-agda/issues
-Description:
-    Simple module useful to generate blog posts from literate Agda files.
-    .
-    Note: Currently this package requires the development version of Hakyll,
-    see <http://mazzo.li/posts/agda-hakyll.html> for more info.
-Data-Files:         css/agda.css
+Description:        Simple module useful to generate blog posts from literate
+                    Agda files.  See <http://mazzo.li/posts/agda-hakyll.html>
+                    for more info.
 
 source-repository head
     type:     git
