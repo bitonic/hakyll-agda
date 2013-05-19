@@ -65,10 +65,18 @@ pairPositions info contents =
 
 -- TODO make these more accurate
 beginCode :: String -> MetaInfo -> Bool
-beginCode s _ = isInfixOf "\\begin{code}" s
+beginCode s _ = "\\begin{code}" `isInfixOf` s
 
 endCode :: String -> MetaInfo -> Bool
-endCode s _ = isInfixOf "\\end{code}" s
+endCode s _ = "\\end{code}" `isInfixOf` s
+
+infixEnd :: Eq a => [a] -> [a] -> [a]
+infixEnd i s = head [drop (length i) s' | s' <- tails s, i `isPrefixOf` s']
+
+stripBegin :: (Integer, String, MetaInfo) -> (Integer, String, MetaInfo)
+stripBegin (i, s, mi) = (i, cut (dropWhile (==' ') (infixEnd "\\begin{code}" s)), mi)
+  where cut ('\n' : s') = s'
+        cut s'          = s'
 
 groupLiterate :: [(Integer, String, MetaInfo)]
               -> [Either String [(Integer, String, MetaInfo)]]
@@ -77,20 +85,18 @@ groupLiterate = begin
     -- TODO Make the spacing cleaner
     begin contents =
         let (com, rest) = span (notCode beginCode) contents
-        in Left ("\n\n" ++ concat [s | (_, s, _) <- com] ++ "\n\n") :
-           case rest of
-               []        -> []
-               _ : rest' -> end rest'
+        in Left ("\n\n" ++ concat [s | (_, s, _) <- com] ++ "\n\n") : end rest
 
     end []  = []
-    end mis = let (code, rest) = span (notCode endCode) mis
-              in Right code :
-                 -- If there's nothing between \end{code} and \begin{code}, we
-                 -- start consuming code again.
-                 case rest of
-                     []                                    -> error "malformed file"
-                     ((_, s, mi) : code') | beginCode s mi -> end code'
-                     (_          : com)                    -> begin com
+    end (be : mis) =
+        let (code, rest) = span (notCode endCode) mis
+        in Right (stripBegin be : code) :
+           -- If there's nothing between \end{code} and \begin{code}, we
+           -- start consuming code again.
+           case rest of
+               []                                    -> error "malformed file"
+               ((_, s, mi) : code') | beginCode s mi -> end code'
+               (_          : com)                    -> begin com
 
     notCode f (_, s, mi) = not (f s mi)
 
