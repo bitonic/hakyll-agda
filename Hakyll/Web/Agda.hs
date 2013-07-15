@@ -138,8 +138,9 @@ toMarkdown classpr m contents =
     concat [ case c of
                   Left s   -> s
                   Right cs ->
-                      let h = pre . mconcat $ [ (annotate m pos mi (stringToHtml s))
-                                              | (pos, s, mi) <- cs ]
+                      let h = pre . tag "code" . mconcat $
+                              [ (annotate m pos mi (stringToHtml s))
+                              | (pos, s, mi) <- cs ]
                       in  renderHtmlFragment (h ! [theclass classpr])
            | c <- contents ]
 
