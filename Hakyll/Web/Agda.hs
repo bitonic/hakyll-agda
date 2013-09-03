@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 -- Parts of the code (specifically parts of `pairPositions' and `groupLiterate')
 -- are taken from the Agda.Interaction.Highlighting.HTML module of Agda, see
 -- <http://code.haskell.org/Agda/LICENSE> for the license and the copyright
@@ -64,41 +65,42 @@ pairPositions info contents =
     infoMap = toMap (decompress info)
 
 -- TODO make these more accurate
-beginCode :: String -> MetaInfo -> Bool
-beginCode s _ = "\\begin{code}" `isInfixOf` s
+beginCode :: String -> Bool
+beginCode s = "\\begin{code}" `isInfixOf` s
 
-endCode :: String -> MetaInfo -> Bool
-endCode s _ = "\\end{code}" `isInfixOf` s
+endCode :: String -> Bool
+endCode s = "\\end{code}" `isInfixOf` s
 
 infixEnd :: Eq a => [a] -> [a] -> [a]
 infixEnd i s = head [drop (length i) s' | s' <- tails s, i `isPrefixOf` s']
 
 stripBegin :: (Integer, String, MetaInfo) -> (Integer, String, MetaInfo)
-stripBegin (i, s, mi) = (i, cut (dropWhile (==' ') (infixEnd "\\begin{code}" s)), mi)
+stripBegin (i, s, mi) = (i, cut (dropWhile (== ' ') (infixEnd "\\begin{code}" s)), mi)
   where cut ('\n' : s') = s'
         cut s'          = s'
 
 groupLiterate :: [(Integer, String, MetaInfo)]
               -> [Either String [(Integer, String, MetaInfo)]]
-groupLiterate = begin
+groupLiterate contents =
+    let (com, rest) = span (notCode beginCode) contents
+    in Left ("\n\n" ++ concat [s | (_, s, _) <- com] ++ "\n\n") : go rest
   where
-    -- TODO Make the spacing cleaner
-    begin contents =
-        let (com, rest) = span (notCode beginCode) contents
-        in Left ("\n\n" ++ concat [s | (_, s, _) <- com] ++ "\n\n") : end rest
+    go []         = []
+    go (be : mis) =
+        let be'@(_, s, _) = stripBegin be
+            (code, rest)  = span (notCode endCode) mis
+        in if "\\end{code}" `isInfixOf` s
+           then -- We simply ignore empty code blocks
+                groupLiterate mis
+           else Right (be' : code) :
+                -- If there's nothing between \end{code} and \begin{code}, we
+                -- start consuming code again.
+                case rest of
+                    []                                  -> error "malformed file"
+                    ((_, beginCode -> True, _) : code') -> go code'
+                    (_                         : com  ) -> groupLiterate com
 
-    end []  = []
-    end (be : mis) =
-        let (code, rest) = span (notCode endCode) mis
-        in Right (stripBegin be : code) :
-           -- If there's nothing between \end{code} and \begin{code}, we
-           -- start consuming code again.
-           case rest of
-               []                                    -> error "malformed file"
-               ((_, s, mi) : code') | beginCode s mi -> end code'
-               (_          : com)                    -> begin com
-
-    notCode f (_, s, mi) = not (f s mi)
+    notCode f (_, s, _) = not (f s)
 
 annotate :: TopLevelModuleName -> Integer -> MetaInfo -> Html -> Html
 annotate m pos mi = anchor ! attributes
