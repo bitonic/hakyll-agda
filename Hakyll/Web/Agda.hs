@@ -153,11 +153,13 @@ convert classpr m =
 
 markdownAgda :: CommandLineOptions -> String -> FilePath -> IO String
 markdownAgda opts classpr fp =
-    do r <- TCM.runTCM $ catchError (TCM.setCommandLineOptions opts >>
-                                     checkFile (mkAbsolute fp) >>= convert classpr)
-                       $ \err -> do s <- prettyError err
-                                    liftIO (putStrLn s)
-                                    throwError err
+    do let check =
+               do TCM.setCommandLineOptions opts
+                  checkFile (mkAbsolute fp) >>= convert classpr
+       r <- TCM.runTCMTop $ check `catchError` \err ->
+                do s <- prettyError err
+                   liftIO (putStrLn s)
+                   throwError err
        case r of
            Right s -> return (dropWhile isSpace s)
            Left _  -> exitFailure

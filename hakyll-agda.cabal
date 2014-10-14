@@ -1,6 +1,6 @@
 Cabal-version:      >= 1.6
 Name:               hakyll-agda
-Version:            0.1.7
+Version:            0.1.8
 Author:             Francesco Mazzoli (f@mazzo.li)
 Maintainer:         Francesco Mazzoli (f@mazzo.li)
 Build-Type:         Simple
@@ -21,7 +21,7 @@ source-repository head
 
 Library
     Build-Depends:    base         >= 3      && < 5,
-                      Agda         >= 2.3    && < 3,
+                      Agda         >= 2.4    && < 3,
                       containers   >= 0.3    && < 0.6,
                       directory    >= 1      && < 2,
                       filepath     >= 1      && < 2,
