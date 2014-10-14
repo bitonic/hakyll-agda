@@ -43,22 +43,22 @@ import           Hakyll.Web.Pandoc
 import           Text.Pandoc
 
 checkFile :: AbsolutePath -> TCM TopLevelModuleName
-checkFile file =
-    do TCM.resetState
-       toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheck file
+checkFile file = do
+    TCM.resetState
+    toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheck file
 
 getModule :: TopLevelModuleName -> TCM (HighlightingInfo, String)
-getModule m =
-    do Just mi <- TCM.getVisitedModule m
-       Just f <- Map.lookup m . TCM.stModuleToSource <$> get
-       s <- liftIO . UTF8.readTextFile . filePath $ f
-       return (TCM.iHighlighting (TCM.miInterface mi), s)
+getModule m = do
+    Just mi <- TCM.getVisitedModule m
+    Just f <- Map.lookup m . TCM.stModuleToSource <$> get
+    s <- liftIO . UTF8.readTextFile . filePath $ f
+    return (TCM.iHighlighting (TCM.miInterface mi), s)
 
 pairPositions :: HighlightingInfo -> String -> [(Integer, String, MetaInfo)]
 pairPositions info contents =
-    map (\cs@((mi, (pos, _)) : _) -> (pos, map (snd . snd) cs, maybe mempty id mi)) .
-    groupBy ((==) `on` fst) .
-    map (\(pos, c) -> (Map.lookup pos infoMap, (pos, c))) .
+    map (\cs@((mi, (pos, _)) : _) -> (pos, map (snd . snd) cs, maybe mempty id mi)) $
+    groupBy ((==) `on` fst) $
+    map (\(pos, c) -> (Map.lookup pos infoMap, (pos, c))) $
     zip [1..] $
     contents
   where
@@ -76,11 +76,13 @@ infixEnd i s = head [drop (length i) s' | s' <- tails s, i `isPrefixOf` s']
 
 stripBegin :: (Integer, String, MetaInfo) -> (Integer, String, MetaInfo)
 stripBegin (i, s, mi) = (i, cut (dropWhile (== ' ') (infixEnd "\\begin{code}" s)), mi)
-  where cut ('\n' : s') = s'
-        cut s'          = s'
+  where
+    cut ('\n' : s') = s'
+    cut s'          = s'
 
-groupLiterate :: [(Integer, String, MetaInfo)]
-              -> [Either String [(Integer, String, MetaInfo)]]
+groupLiterate
+    :: [(Integer, String, MetaInfo)]
+    -> [Either String [(Integer, String, MetaInfo)]]
 groupLiterate contents =
     let (com, rest) = span (notCode beginCode) contents
     in Left ("\n\n" ++ concat [s | (_, s, _) <- com] ++ "\n\n") : go rest
@@ -153,43 +155,46 @@ convert classpr m =
 
 markdownAgda :: CommandLineOptions -> String -> FilePath -> IO String
 markdownAgda opts classpr fp =
-    do let check =
-               do TCM.setCommandLineOptions opts
-                  checkFile (mkAbsolute fp) >>= convert classpr
-       r <- TCM.runTCMTop $ check `catchError` \err ->
-                do s <- prettyError err
-                   liftIO (putStrLn s)
-                   throwError err
+    do let check = do
+               TCM.setCommandLineOptions opts
+               checkFile (mkAbsolute fp) >>= convert classpr
+       r <- TCM.runTCMTop $ check `catchError` \err -> do
+                s <- prettyError err
+                liftIO (putStrLn s)
+                throwError err
        case r of
            Right s -> return (dropWhile isSpace s)
            Left _  -> exitFailure
 
 isAgda :: Item a -> Bool
 isAgda i = ex == ".lagda"
-  where ex = snd . splitExtension . toFilePath . itemIdentifier $ i
+  where
+    ex = snd . splitExtension . toFilePath . itemIdentifier $ i
 
 saveDir :: IO a -> IO a
-saveDir m = do origDir <- getCurrentDirectory; m <* setCurrentDirectory origDir
+saveDir m = do
+    origDir <- getCurrentDirectory
+    m <* setCurrentDirectory origDir
 
 pandocAgdaCompilerWith :: ReaderOptions -> WriterOptions -> CommandLineOptions
                        -> Compiler (Item String)
-pandocAgdaCompilerWith ropt wopt aopt =
-    do i <- getResourceBody
-       if isAgda i
-          then cached cacheName $
-               do fp <- getResourceFilePath
-                  -- TODO get rid of the unsafePerformIO, and have a more solid
-                  -- way of getting the absolute path
-                  unsafeCompiler . saveDir $
-                      do -- We set to the directory of the file, we assume that
-                         -- the agda files are in one flat directory which might
-                         -- not be not the one where Hakyll is ran in.
-                         abfp <- canonicalizePath fp
-                         setCurrentDirectory (dropFileName abfp)
-                         s <- markdownAgda aopt "Agda" abfp
-                         let i' = i {itemBody = s}
-                         return (writePandocWith wopt (readMarkdown ropt <$> i'))
-          else pandocCompilerWith ropt wopt
+pandocAgdaCompilerWith ropt wopt aopt = do
+    i <- getResourceBody
+    if isAgda i
+      then cached cacheName $ do
+        fp <- getResourceFilePath
+        -- TODO get rid of the unsafePerformIO, and have a more solid
+        -- way of getting the absolute path
+        unsafeCompiler $ saveDir $ do
+             -- We set to the directory of the file, we assume that
+             -- the agda files are in one flat directory which might
+             -- not be not the one where Hakyll is ran in.
+             abfp <- canonicalizePath fp
+             setCurrentDirectory (dropFileName abfp)
+             s <- markdownAgda aopt "Agda" abfp
+             let i' = i {itemBody = s}
+             return (writePandocWith wopt (readMarkdown ropt <$> i'))
+      else pandocCompilerWith ropt wopt
   where
     cacheName = "LiterateAgda.pandocAgdaCompilerWith"
 
