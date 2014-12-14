@@ -19,8 +19,8 @@ import           Data.Monoid
 import           Control.Monad.Error (catchError, throwError)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.State (get)
-import qualified Data.Map as Map
-import           System.Directory
+import qualified Data.IntMap as IntMap
+import           System.Directory hiding (findFile)
 import           System.Exit (exitFailure)
 import           System.FilePath
 import           Text.XHtml.Strict
@@ -28,6 +28,7 @@ import           Text.XHtml.Strict
 import           Agda.Interaction.Highlighting.Precise
 import qualified Agda.Interaction.Imports as Imp
 import           Agda.Interaction.Options
+import           Agda.Interaction.FindFile (findFile)
 import           Agda.Syntax.Abstract.Name (toTopLevelModuleName)
 import           Agda.Syntax.Common
 import           Agda.Syntax.Concrete.Name (TopLevelModuleName)
@@ -36,6 +37,7 @@ import           Agda.TypeChecking.Monad (TCM)
 import qualified Agda.TypeChecking.Monad as TCM
 import           Agda.Utils.FileName
 import qualified Agda.Utils.IO.UTF8 as UTF8
+import           Agda.Utils.Lens (use)
 import           Hakyll.Core.Compiler
 import           Hakyll.Core.Identifier
 import           Hakyll.Core.Item
@@ -45,20 +47,20 @@ import           Text.Pandoc
 checkFile :: AbsolutePath -> TCM TopLevelModuleName
 checkFile file = do
     TCM.resetState
-    toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheck file
+    toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheckMain file
 
 getModule :: TopLevelModuleName -> TCM (HighlightingInfo, String)
 getModule m = do
     Just mi <- TCM.getVisitedModule m
-    Just f <- Map.lookup m . TCM.stModuleToSource <$> get
+    f <- findFile m
     s <- liftIO . UTF8.readTextFile . filePath $ f
     return (TCM.iHighlighting (TCM.miInterface mi), s)
 
-pairPositions :: HighlightingInfo -> String -> [(Integer, String, MetaInfo)]
+pairPositions :: HighlightingInfo -> String -> [(Integer, String, Aspects)]
 pairPositions info contents =
-    map (\cs@((mi, (pos, _)) : _) -> (pos, map (snd . snd) cs, maybe mempty id mi)) $
+    map (\cs@((mi, (pos, _)) : _) -> (toInteger pos, map (snd . snd) cs, maybe mempty id mi)) $
     groupBy ((==) `on` fst) $
-    map (\(pos, c) -> (Map.lookup pos infoMap, (pos, c))) $
+    map (\(pos, c) -> (IntMap.lookup pos infoMap, (pos, c))) $
     zip [1..] $
     contents
   where
@@ -74,15 +76,15 @@ endCode s = "\\end{code}" `isInfixOf` s
 infixEnd :: Eq a => [a] -> [a] -> [a]
 infixEnd i s = head [drop (length i) s' | s' <- tails s, i `isPrefixOf` s']
 
-stripBegin :: (Integer, String, MetaInfo) -> (Integer, String, MetaInfo)
+stripBegin :: (Integer, String, Aspects) -> (Integer, String, Aspects)
 stripBegin (i, s, mi) = (i, cut (dropWhile (== ' ') (infixEnd "\\begin{code}" s)), mi)
   where
     cut ('\n' : s') = s'
     cut s'          = s'
 
 groupLiterate
-    :: [(Integer, String, MetaInfo)]
-    -> [Either String [(Integer, String, MetaInfo)]]
+    :: [(Integer, String, Aspects)]
+    -> [Either String [(Integer, String, Aspects)]]
 groupLiterate contents =
     let (com, rest) = span (notCode beginCode) contents
     in Left ("\n\n" ++ concat [s | (_, s, _) <- com] ++ "\n\n") : go rest
@@ -104,7 +106,7 @@ groupLiterate contents =
 
     notCode f (_, s, _) = not (f s)
 
-annotate :: TopLevelModuleName -> Integer -> MetaInfo -> Html -> Html
+annotate :: TopLevelModuleName -> Integer -> Aspects -> Html -> Html
 annotate m pos mi = anchor ! attributes
   where
     attributes = [name (show pos)] ++
@@ -136,7 +138,7 @@ annotate m pos mi = anchor ! attributes
                       else Nothing
 
 toMarkdown :: String
-           -> TopLevelModuleName -> [Either String [(Integer, String, MetaInfo)]]
+           -> TopLevelModuleName -> [Either String [(Integer, String, Aspects)]]
            -> String
 toMarkdown classpr m contents =
     concat [ case c of
