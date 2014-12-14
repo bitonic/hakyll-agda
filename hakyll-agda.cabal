@@ -1,6 +1,6 @@
 Cabal-version:      >= 1.6
 Name:               hakyll-agda
-Version:            0.1.8
+Version:            0.1.9
 Author:             Francesco Mazzoli (f@mazzo.li)
 Maintainer:         Francesco Mazzoli (f@mazzo.li)
 Build-Type:         Simple
@@ -8,7 +8,7 @@ License:            BSD3
 Build-Type:         Simple
 Category:           Web
 Synopsis:           Wrapper to integrate literate Agda files with Hakyll
-Tested-With:        GHC==7.6.3
+Tested-With:        GHC==7.8.3
 Homepage:           https://github.com/bitonic/hakyll-agda
 Bug-Reports:        https://github.com/bitonic/hakyll-agda/issues
 Description:        Simple module useful to generate blog posts from literate
@@ -21,7 +21,7 @@ source-repository head
 
 Library
     Build-Depends:    base         >= 3 && < 5,
-                      Agda         >= 2.4,
+                      Agda         >= 2.4.2.2,
                       containers   >= 0.3,
                       directory    >= 1,
                       filepath     >= 1,
