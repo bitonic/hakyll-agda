@@ -189,7 +189,9 @@ pandocAgdaCompilerWith ropt wopt aopt = do
              setCurrentDirectory (dropFileName abfp)
              s <- markdownAgda aopt "Agda" abfp
              let i' = i {itemBody = s}
-             return (writePandocWith wopt (readMarkdown ropt <$> i'))
+             case traverse (readMarkdown ropt) i' of
+               Left err -> fail $ "pandocAgdaCompilerWith: Pandoc failed with error " ++ show err
+               Right i'' -> return $ writePandocWith wopt i''
       else pandocCompilerWith ropt wopt
   where
     cacheName = "LiterateAgda.pandocAgdaCompilerWith"
