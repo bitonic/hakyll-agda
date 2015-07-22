@@ -9,26 +9,10 @@ module Hakyll.Web.Agda
     , pandocAgdaCompiler
     ) where
 
-import           Control.Applicative
-import           Data.Char
-import           Data.Function
-import           Data.List
-import           Data.Maybe
-import           Data.Monoid
-
-import           Control.Monad.Error (catchError, throwError)
-import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.State (get)
-import qualified Data.IntMap as IntMap
-import           System.Directory hiding (findFile)
-import           System.Exit (exitFailure)
-import           System.FilePath
-import           Text.XHtml.Strict
-
+import           Agda.Interaction.FindFile (findFile)
 import           Agda.Interaction.Highlighting.Precise
 import qualified Agda.Interaction.Imports as Imp
 import           Agda.Interaction.Options
-import           Agda.Interaction.FindFile (findFile)
 import           Agda.Syntax.Abstract.Name (toTopLevelModuleName)
 import           Agda.Syntax.Common
 import           Agda.Syntax.Concrete.Name (TopLevelModuleName)
@@ -37,12 +21,22 @@ import           Agda.TypeChecking.Monad (TCM)
 import qualified Agda.TypeChecking.Monad as TCM
 import           Agda.Utils.FileName
 import qualified Agda.Utils.IO.UTF8 as UTF8
-import           Agda.Utils.Lens (use)
+import           Control.Monad.Except (catchError, throwError)
+import           Control.Monad.IO.Class (liftIO)
+import           Data.Char (isSpace)
+import           Data.Function (on)
+import qualified Data.IntMap as IntMap
+import           Data.List (groupBy, isInfixOf, isPrefixOf, tails)
+import           Data.Maybe (fromMaybe)
 import           Hakyll.Core.Compiler
 import           Hakyll.Core.Identifier
 import           Hakyll.Core.Item
 import           Hakyll.Web.Pandoc
-import           Text.Pandoc
+import           System.Directory (getCurrentDirectory, setCurrentDirectory, canonicalizePath, setCurrentDirectory)
+import           System.Exit (exitFailure)
+import           System.FilePath (dropFileName, splitExtension)
+import           Text.Pandoc (readMarkdown, ReaderOptions, WriterOptions)
+import           Text.XHtml.Strict
 
 checkFile :: AbsolutePath -> TCM TopLevelModuleName
 checkFile file = do
