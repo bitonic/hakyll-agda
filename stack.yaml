@@ -1,0 +1,11 @@
+packages:
+- '.'
+extra-deps:
+- Agda-2.4.2.3
+- STMonadTrans-0.3.3
+- boxes-0.1.4
+- data-hash-0.2.0.0
+- equivalence-0.3.1
+- geniplate-mirror-0.6.0.7
+- hakyll-4.7.2.0
+resolver: nightly-2015-07-21
