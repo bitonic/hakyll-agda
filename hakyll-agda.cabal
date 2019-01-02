@@ -6,7 +6,6 @@ Maintainer:         Francesco Mazzoli (f@mazzo.li)
 Build-Type:         Simple
 License:            BSD3
 License-File:       LICENSE
-Build-Type:         Simple
 Category:           Web
 Synopsis:           Wrapper to integrate literate Agda files with Hakyll
 Tested-With:        GHC==8.4.4
