@@ -36,12 +36,14 @@ import           System.Directory (getCurrentDirectory, setCurrentDirectory, can
 import           System.Exit (exitFailure)
 import           System.FilePath (dropFileName, splitExtension)
 import           Text.Pandoc (readMarkdown, ReaderOptions, WriterOptions)
+import qualified Text.Pandoc as Pandoc
 import           Text.XHtml.Strict
+import qualified Data.Text as T
 
 checkFile :: AbsolutePath -> TCM TopLevelModuleName
 checkFile file = do
     TCM.resetState
-    toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheckMain file
+    toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheckMain file Imp.TypeCheck
 
 getModule :: TopLevelModuleName -> TCM (HighlightingInfo, String)
 getModule m = do
@@ -127,9 +129,9 @@ annotate m pos mi = anchor ! attributes
     -- Notes are not included.
     noteClasses _ = []
 
-    link (m', pos') = if m == m'
-                      then Just [href ("#" ++ show pos')]
-                      else Nothing
+    link defSite = if defSiteModule defSite == m
+      then Just [href ("#" ++ show (defSitePos defSite))]
+      else Nothing
 
 toMarkdown :: String
            -> TopLevelModuleName -> [Either String [(Integer, String, Aspects)]]
@@ -188,8 +190,8 @@ pandocAgdaCompilerWith ropt wopt aopt = do
              abfp <- canonicalizePath fp
              setCurrentDirectory (dropFileName abfp)
              s <- markdownAgda aopt "Agda" abfp
-             let i' = i {itemBody = s}
-             case traverse (readMarkdown ropt) i' of
+             let i' = i {itemBody = T.pack s}
+             case Pandoc.runPure (traverse (readMarkdown ropt) i') of
                Left err -> fail $ "pandocAgdaCompilerWith: Pandoc failed with error " ++ show err
                Right i'' -> return $ writePandocWith wopt i''
       else pandocCompilerWith ropt wopt

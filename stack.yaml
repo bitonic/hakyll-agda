@@ -1,13 +1,7 @@
 packages:
 - '.'
 extra-deps:
-- Agda-2.4.2.3
-- STMonadTrans-0.3.3
-- boxes-0.1.4
-- data-hash-0.2.0.0
-- equivalence-0.3.1
-- geniplate-mirror-0.6.0.7
-- hakyll-4.8.0.0
-- vector-0.11.0.0
-resolver: lts-3.22
+- Agda-2.5.4.2
+- hakyll-4.12.4.0
+resolver: lts-12.26
 
