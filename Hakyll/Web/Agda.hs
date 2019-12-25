@@ -28,6 +28,9 @@ import           Data.Function (on)
 import qualified Data.IntMap as IntMap
 import           Data.List (groupBy, isInfixOf, isPrefixOf, tails)
 import           Data.Maybe (fromMaybe)
+import qualified Data.Set as Set
+import           Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as TL
 import           Hakyll.Core.Compiler
 import           Hakyll.Core.Identifier
 import           Hakyll.Core.Item
@@ -43,9 +46,11 @@ import qualified Data.Text as T
 checkFile :: AbsolutePath -> TCM TopLevelModuleName
 checkFile file = do
     TCM.resetState
-    toTopLevelModuleName . TCM.iModuleName . fst <$> Imp.typeCheckMain file Imp.TypeCheck
+    info <- Imp.sourceInfo file
+    toTopLevelModuleName . TCM.iModuleName . fst <$>
+      Imp.typeCheckMain file Imp.TypeCheck info
 
-getModule :: TopLevelModuleName -> TCM (HighlightingInfo, String)
+getModule :: TopLevelModuleName -> TCM (HighlightingInfo, Text)
 getModule m = do
     Just mi <- TCM.getVisitedModule m
     f <- findFile m
@@ -124,7 +129,7 @@ annotate m pos mi = anchor ! attributes
         in kindClass ++ opClass
     aspectClasses a = [show a]
 
-    otherAspectClasses = map show
+    otherAspectClasses = map show . Set.toList
 
     -- Notes are not included.
     noteClasses _ = []
@@ -149,7 +154,7 @@ toMarkdown classpr m contents =
 convert :: String -> TopLevelModuleName -> TCM String
 convert classpr m =
     do (info, contents) <- getModule m
-       return . toMarkdown classpr m . groupLiterate . pairPositions info $ contents
+       return . toMarkdown classpr m . groupLiterate . pairPositions info . TL.unpack $ contents
 
 markdownAgda :: CommandLineOptions -> String -> FilePath -> IO String
 markdownAgda opts classpr fp =
