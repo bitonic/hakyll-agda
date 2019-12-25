@@ -21,7 +21,7 @@ source-repository head
 
 Library
     Build-Depends:    base         >= 3 && < 5
-                    , Agda         == 2.5.*
+                    , Agda         == 2.6.*
                     , containers
                     , directory
                     , filepath
