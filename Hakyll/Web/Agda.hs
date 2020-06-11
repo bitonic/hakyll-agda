@@ -9,7 +9,7 @@ module Hakyll.Web.Agda
     , pandocAgdaCompiler
     ) where
 
-import           Agda.Interaction.FindFile (findFile)
+import           Agda.Interaction.FindFile (findFile, SourceFile(..))
 import           Agda.Interaction.Highlighting.Precise
 import qualified Agda.Interaction.Imports as Imp
 import           Agda.Interaction.Options
@@ -43,7 +43,7 @@ import qualified Text.Pandoc as Pandoc
 import           Text.XHtml.Strict
 import qualified Data.Text as T
 
-checkFile :: AbsolutePath -> TCM TopLevelModuleName
+checkFile :: SourceFile -> TCM TopLevelModuleName
 checkFile file = do
     TCM.resetState
     info <- Imp.sourceInfo file
@@ -54,7 +54,7 @@ getModule :: TopLevelModuleName -> TCM (HighlightingInfo, Text)
 getModule m = do
     Just mi <- TCM.getVisitedModule m
     f <- findFile m
-    s <- liftIO . UTF8.readTextFile . filePath $ f
+    s <- liftIO . UTF8.readTextFile . filePath . srcFilePath $ f
     return (TCM.iHighlighting (TCM.miInterface mi), s)
 
 pairPositions :: HighlightingInfo -> String -> [(Integer, String, Aspects)]
@@ -156,11 +156,11 @@ convert classpr m =
     do (info, contents) <- getModule m
        return . toMarkdown classpr m . groupLiterate . pairPositions info . TL.unpack $ contents
 
-markdownAgda :: CommandLineOptions -> String -> FilePath -> IO String
-markdownAgda opts classpr fp =
+markdownAgda :: CommandLineOptions -> String -> SourceFile -> IO String
+markdownAgda opts classpr file =
     do let check = do
                TCM.setCommandLineOptions opts
-               checkFile (mkAbsolute fp) >>= convert classpr
+               checkFile file >>= convert classpr
        r <- TCM.runTCMTop $ check `catchError` \err -> do
                 s <- prettyError err
                 liftIO (putStrLn s)
@@ -194,7 +194,7 @@ pandocAgdaCompilerWith ropt wopt aopt = do
              -- not be not the one where Hakyll is ran in.
              abfp <- canonicalizePath fp
              setCurrentDirectory (dropFileName abfp)
-             s <- markdownAgda aopt "Agda" abfp
+             s <- markdownAgda aopt "Agda" (SourceFile $ mkAbsolute abfp)
              let i' = i {itemBody = T.pack s}
              case Pandoc.runPure (traverse (readMarkdown ropt) i') of
                Left err -> fail $ "pandocAgdaCompilerWith: Pandoc failed with error " ++ show err
