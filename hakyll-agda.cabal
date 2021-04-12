@@ -1,6 +1,6 @@
 Cabal-version:      >= 1.10
 Name:               hakyll-agda
-Version:            0.1.12
+Version:            0.1.13
 Author:             Francesco Mazzoli (f@mazzo.li)
 Maintainer:         Francesco Mazzoli (f@mazzo.li)
 Build-Type:         Simple

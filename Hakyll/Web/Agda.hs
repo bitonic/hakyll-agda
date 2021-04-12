@@ -7,6 +7,8 @@ module Hakyll.Web.Agda
     ( markdownAgda
     , pandocAgdaCompilerWith
     , pandocAgdaCompiler
+    , isAgda
+    , agdaPandocCompiler
     ) where
 
 import           Agda.Interaction.FindFile (findFile, SourceFile(..))
@@ -179,29 +181,34 @@ saveDir m = do
     origDir <- getCurrentDirectory
     m <* setCurrentDirectory origDir
 
+agdaPandocCompiler :: ReaderOptions -> WriterOptions -> CommandLineOptions -> Compiler (Item String)
+agdaPandocCompiler ropt wopt aopt = do
+  i <- getResourceBody
+  cached cacheName $ do
+    fp <- getResourceFilePath
+    -- TODO get rid of the unsafePerformIO, and have a more solid
+    -- way of getting the absolute path
+    unsafeCompiler $ saveDir $ do
+      -- We set to the directory of the file, we assume that
+      -- the agda files are in one flat directory which might
+      -- not be not the one where Hakyll is ran in.
+      abfp <- canonicalizePath fp
+      setCurrentDirectory (dropFileName abfp)
+      s <- markdownAgda aopt "Agda" (SourceFile $ mkAbsolute abfp)
+      let i' = i {itemBody = T.pack s}
+      case Pandoc.runPure (traverse (readMarkdown ropt) i') of
+       Left err -> fail $ "pandocAgdaCompilerWith: Pandoc failed with error " ++ show err
+       Right i'' -> return $ writePandocWith wopt i''
+  where
+    cacheName = "LiterateAgda.pandocAgdaCompilerWith"
+
 pandocAgdaCompilerWith :: ReaderOptions -> WriterOptions -> CommandLineOptions
                        -> Compiler (Item String)
 pandocAgdaCompilerWith ropt wopt aopt = do
-    i <- getResourceBody
-    if isAgda i
-      then cached cacheName $ do
-        fp <- getResourceFilePath
-        -- TODO get rid of the unsafePerformIO, and have a more solid
-        -- way of getting the absolute path
-        unsafeCompiler $ saveDir $ do
-             -- We set to the directory of the file, we assume that
-             -- the agda files are in one flat directory which might
-             -- not be not the one where Hakyll is ran in.
-             abfp <- canonicalizePath fp
-             setCurrentDirectory (dropFileName abfp)
-             s <- markdownAgda aopt "Agda" (SourceFile $ mkAbsolute abfp)
-             let i' = i {itemBody = T.pack s}
-             case Pandoc.runPure (traverse (readMarkdown ropt) i') of
-               Left err -> fail $ "pandocAgdaCompilerWith: Pandoc failed with error " ++ show err
-               Right i'' -> return $ writePandocWith wopt i''
-      else pandocCompilerWith ropt wopt
-  where
-    cacheName = "LiterateAgda.pandocAgdaCompilerWith"
+  i <- getResourceBody
+  if isAgda i
+    then agdaPandocCompiler ropt wopt aopt
+    else pandocCompilerWith ropt wopt
 
 pandocAgdaCompiler :: Compiler (Item String)
 pandocAgdaCompiler =
