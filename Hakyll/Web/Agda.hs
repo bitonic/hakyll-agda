@@ -1,10 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -- Parts of the code (specifically parts of `pairPositions' and `groupLiterate')
 -- are taken from the Agda.Interaction.Highlighting.HTML module of Agda, see
 -- <http://code.haskell.org/Agda/LICENSE> for the license and the copyright
 -- information for that code.
 module Hakyll.Web.Agda
     ( markdownAgda
+    , pandocAgdaCompilerWithTransformM
     , pandocAgdaCompilerWith
     , pandocAgdaCompiler
     , isAgda
@@ -36,11 +38,12 @@ import qualified Data.Text.Lazy as TL
 import           Hakyll.Core.Compiler
 import           Hakyll.Core.Identifier
 import           Hakyll.Core.Item
+import           Hakyll.Core.Compiler.Internal
 import           Hakyll.Web.Pandoc
 import           System.Directory (getCurrentDirectory, setCurrentDirectory, canonicalizePath, setCurrentDirectory)
 import           System.Exit (exitFailure)
 import           System.FilePath (dropFileName, splitExtension)
-import           Text.Pandoc (readMarkdown, ReaderOptions, WriterOptions)
+import           Text.Pandoc (readMarkdown, ReaderOptions, WriterOptions, Pandoc)
 import qualified Text.Pandoc as Pandoc
 import           Text.XHtml.Strict
 import qualified Data.Text as T
@@ -181,14 +184,15 @@ saveDir m = do
     origDir <- getCurrentDirectory
     m <* setCurrentDirectory origDir
 
-agdaPandocCompiler :: ReaderOptions -> WriterOptions -> CommandLineOptions -> Compiler (Item String)
-agdaPandocCompiler ropt wopt aopt = do
+agdaPandocCompiler ::
+  ReaderOptions -> WriterOptions -> CommandLineOptions -> (Pandoc -> Compiler Pandoc) -> Compiler (Item String)
+agdaPandocCompiler ropt wopt aopt transform = do
   i <- getResourceBody
-  cached cacheName $ do
-    fp <- getResourceFilePath
-    -- TODO get rid of the unsafePerformIO, and have a more solid
-    -- way of getting the absolute path
-    unsafeCompiler $ saveDir $ do
+  -- TODO get rid of the unsafePerformIO, and have a more solid
+  -- way of getting the absolute path
+  cached cacheName $ Compiler $ \env -> do
+    CompilerDone fp _ <- runCompiler getResourceFilePath env
+    res :: Item String <- saveDir $ do
       -- We set to the directory of the file, we assume that
       -- the agda files are in one flat directory which might
       -- not be not the one where Hakyll is ran in.
@@ -198,19 +202,27 @@ agdaPandocCompiler ropt wopt aopt = do
       let i' = i {itemBody = T.pack s}
       case Pandoc.runPure (traverse (readMarkdown ropt) i') of
        Left err -> fail $ "pandocAgdaCompilerWith: Pandoc failed with error " ++ show err
-       Right i'' -> return $ writePandocWith wopt i''
+       Right i'' -> do
+         CompilerDone i''' _ <- unCompiler (traverse transform i'') env
+         return (writePandocWith wopt i''')
+    return (CompilerDone res mempty)
   where
     cacheName = "LiterateAgda.pandocAgdaCompilerWith"
 
-pandocAgdaCompilerWith :: ReaderOptions -> WriterOptions -> CommandLineOptions
-                       -> Compiler (Item String)
+pandocAgdaCompilerWith ::
+  ReaderOptions -> WriterOptions -> CommandLineOptions -> Compiler (Item String)
 pandocAgdaCompilerWith ropt wopt aopt = do
+  pandocAgdaCompilerWithTransformM ropt wopt aopt return
+
+-- | The transform must essentially be an IO action (no dependencies)
+pandocAgdaCompilerWithTransformM ::
+  ReaderOptions -> WriterOptions -> CommandLineOptions -> (Pandoc -> Compiler Pandoc) -> Compiler (Item String)
+pandocAgdaCompilerWithTransformM ropt wopt aopt transform = do
   i <- getResourceBody
   if isAgda i
-    then agdaPandocCompiler ropt wopt aopt
-    else pandocCompilerWith ropt wopt
+    then agdaPandocCompiler ropt wopt aopt transform
+    else pandocCompilerWithTransformM ropt wopt transform
 
 pandocAgdaCompiler :: Compiler (Item String)
 pandocAgdaCompiler =
-    pandocAgdaCompilerWith defaultHakyllReaderOptions defaultHakyllWriterOptions
-                           defaultOptions
+    pandocAgdaCompilerWith defaultHakyllReaderOptions defaultHakyllWriterOptions defaultOptions

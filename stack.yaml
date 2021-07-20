@@ -1,9 +1,9 @@
 packages:
-  - '.'
+- '.'
 extra-deps:
-  - Agda-2.6.1
-  - data-hash-0.2.0.1
-  - equivalence-0.3.5
-  - geniplate-mirror-0.7.7
-  - STMonadTrans-0.4.4
-resolver: lts-16.0
+- Agda-2.6.2@sha256:4119e4477b39807934295a46ca2ade58f861963501683e6687869602d4315fd8,36202
+- data-hash-0.2.0.1
+- equivalence-0.3.5
+- geniplate-mirror-0.7.7
+- STMonadTrans-0.4.4
+resolver: lts-16.31
